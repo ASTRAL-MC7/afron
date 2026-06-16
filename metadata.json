@@ -1,0 +1,19 @@
+# GEMINI_API_KEY: Required for Gemini AI API calls.
+# AI Studio automatically injects this at runtime from user secrets.
+# Users configure this via the Secrets panel in the AI Studio UI.
+GEMINI_API_KEY="MY_GEMINI_API_KEY"
+
+# APP_URL: The URL where this applet is hosted.
+# AI Studio automatically injects this at runtime with the Cloud Run service URL.
+# Used for self-referential links, OAuth callbacks, and API endpoints.
+APP_URL="MY_APP_URL"
+
+# TELEGRAM_BOT_TOKEN: The API Token for your Telegram Bot from @BotFather
+TELEGRAM_BOT_TOKEN="YOUR_TELEGRAM_BOT_TOKEN"
+
+# DATABASE_URL: ElephantSQL, Neon.tech, Supabase, or other cloud PostgreSQL connection string
+DATABASE_URL="postgresql://user:password@host:port/dbname?sslmode=require"
+
+# RENDER_EXTERNAL_URL: Your Render web service public URL (e.g. https://your-app.onrender.com)
+# Render automatically sets this, but you can also use WEBHOOK_URL.
+RENDER_EXTERNAL_URL="https://your-app-name.onrender.com"
