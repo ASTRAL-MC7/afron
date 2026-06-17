@@ -456,7 +456,7 @@ let botStatus: "inactive" | "active" | "error" = "inactive";
 
 function initializeBot() {
   const dbData = readDB();
-  const token = dbData.settings.botToken || process.env.TELEGRAM_BOT_TOKEN;
+  const token = process.env.TELEGRAM_BOT_TOKEN || dbData.settings.botToken;
 
   if (bot) {
     try {
@@ -1397,7 +1397,7 @@ app.get("/api/stats", (req, res) => {
 // 4. Settings Configuration
 app.get("/api/settings", (req, res) => {
   const db = readDB();
-  const token = db.settings.botToken || process.env.TELEGRAM_BOT_TOKEN || "";
+  const token = process.env.TELEGRAM_BOT_TOKEN || db.settings.botToken || "";
   const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.WEBHOOK_URL || "";
   const cleanToken = token.replace(/[^a-zA-Z0-9]/g, "");
   
@@ -1430,7 +1430,7 @@ app.post("/api/settings", (req, res) => {
     initializeBot();
   }
 
-  const token = db.settings.botToken || process.env.TELEGRAM_BOT_TOKEN || "";
+  const token = process.env.TELEGRAM_BOT_TOKEN || db.settings.botToken || "";
   const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.WEBHOOK_URL || "";
   const cleanToken = token.replace(/[^a-zA-Z0-9]/g, "");
 
@@ -1447,7 +1447,7 @@ app.post("/api/settings", (req, res) => {
 // Telegram Webhook Handler Route
 app.post("/webhook/:botTokenPath", (req, res) => {
   const db = readDB();
-  const token = db.settings.botToken || process.env.TELEGRAM_BOT_TOKEN || "";
+  const token = process.env.TELEGRAM_BOT_TOKEN || db.settings.botToken || "";
   const cleanToken = token.replace(/[^a-zA-Z0-9]/g, "");
 
   if (req.params.botTokenPath === cleanToken && bot) {
