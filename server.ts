@@ -1253,7 +1253,7 @@ function initializeBot() {
     // Run Bot in Webhook or Polling mode depending on RENDER_EXTERNAL_URL / WEBHOOK_URL presence
     const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.WEBHOOK_URL;
     if (publicUrl) {
-      const cleanToken = token.replace(/[^a-zA-Z0-9]/g, "");
+      const cleanToken = encodeURIComponent(token.trim());
       const finalWebhookUrl = `${publicUrl.replace(/\/$/, "")}/webhook/${cleanToken}`;
       console.log(`Setting Telegram Webhook endpoint to: ${finalWebhookUrl}`);
       
@@ -1474,7 +1474,7 @@ app.get("/api/settings", (req, res) => {
   const db = readDB();
   const token = db.settings.botToken || process.env.TELEGRAM_BOT_TOKEN || "";
   const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.WEBHOOK_URL || "";
-  const cleanToken = token.replace(/[^a-zA-Z0-9]/g, "");
+  const cleanToken = encodeURIComponent(token.trim());
   
   res.json({
     settings: db.settings,
@@ -1507,7 +1507,7 @@ app.post("/api/settings", (req, res) => {
 
   const token = db.settings.botToken || process.env.TELEGRAM_BOT_TOKEN || "";
   const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.WEBHOOK_URL || "";
-  const cleanToken = token.replace(/[^a-zA-Z0-9]/g, "");
+  const cleanToken = encodeURIComponent(token.trim());
 
   res.json({ 
     success: true, 
@@ -1523,7 +1523,7 @@ app.post("/api/settings", (req, res) => {
 app.post("/webhook/:botTokenPath", (req, res) => {
   const db = readDB();
   const token = db.settings.botToken || process.env.TELEGRAM_BOT_TOKEN || "";
-  const cleanToken = token.replace(/[^a-zA-Z0-9]/g, "");
+  const cleanToken = encodeURIComponent(token.trim());
 
   if (req.params.botTokenPath === cleanToken && bot) {
     bot.handleUpdate(req.body, res)
