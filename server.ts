@@ -12,7 +12,7 @@ const { Pool } = pg;
 const app = express();
 app.use(express.json());
 
-const PORT = 3000;
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 const DATABASE_DIR = path.join(process.cwd(), "data");
 const DATABASE_FILE = path.join(DATABASE_DIR, "database.json");
 
@@ -33,6 +33,8 @@ interface DBData {
     telegramUsername: string | null;
     startTime: string;
     endTime: string;
+    startTime2?: string | null;
+    endTime2?: string | null;
     createdAt: number;
   }>;
   attendance: Array<{
@@ -203,6 +205,8 @@ async function initDatabaseSchema() {
         telegram_username VARCHAR(255),
         start_time VARCHAR(10) NOT NULL,
         end_time VARCHAR(10) NOT NULL,
+        start_time2 VARCHAR(10),
+        end_time2 VARCHAR(10),
         created_at BIGINT NOT NULL
       );
     `);
@@ -251,9 +255,9 @@ async function saveToPostgres(data: DBData) {
     await client.query("DELETE FROM employees");
     for (const emp of data.employees) {
       await client.query(
-        `INSERT INTO employees (id, name, telegram_id, telegram_username, start_time, end_time, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [emp.id, emp.name, emp.telegramId, emp.telegramUsername, emp.startTime, emp.endTime, emp.createdAt]
+        `INSERT INTO employees (id, name, telegram_id, telegram_username, start_time, end_time, start_time2, end_time2, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [emp.id, emp.name, emp.telegramId, emp.telegramUsername, emp.startTime, emp.endTime, emp.startTime2 || null, emp.endTime2 || null, emp.createdAt]
       );
     }
 
@@ -321,6 +325,8 @@ async function loadFromPostgres(): Promise<DBData | null> {
       telegramUsername: row.telegram_username,
       startTime: row.start_time,
       endTime: row.end_time,
+      startTime2: row.start_time2 || null,
+      endTime2: row.end_time2 || null,
       createdAt: Number(row.created_at)
     }));
 
@@ -456,7 +462,7 @@ let botStatus: "inactive" | "active" | "error" = "inactive";
 
 function initializeBot() {
   const dbData = readDB();
-  const token = process.env.TELEGRAM_BOT_TOKEN || dbData.settings.botToken;
+  const token = dbData.settings.botToken || process.env.TELEGRAM_BOT_TOKEN;
 
   if (bot) {
     try {
@@ -526,7 +532,7 @@ function initializeBot() {
         empMsg += `<i>Tizimda xodimlar mavjud emas. Web-dashboard yoki /add buyrug'i orqali yangi xodim kiriting.</i>`;
       } else {
         db.employees.forEach((emp) => {
-          empMsg += `• 👤 <b>${emp.name}</b>\n   ID: <code>${emp.id}</code> | Rejim: ${emp.startTime} - ${emp.endTime}\n\n`;
+          empMsg += `• 👤 <b>${emp.name}</b>\n   ID: <code>${emp.id}</code> | Rejim: ${emp.startTime} - ${emp.endTime}${emp.startTime2 && emp.endTime2 ? ` / ${emp.startTime2} - ${emp.endTime2}` : ''}\n\n`;
           keyboard.push([
             { text: `🧼 ${emp.name.split(" ")[0]} Jarima 0`, callback_data: `clear_p_${emp.id}` },
             { text: `❌ O'chirish`, callback_data: `del_e_${emp.id}` }
@@ -584,7 +590,7 @@ function initializeBot() {
         }
 
         const resp = `👋 Xush kelibsiz, <b>${employee.name}</b>!\n\n` +
-                     `⚙️ Ish rejimingiz: <b>${employee.startTime} dan ${employee.endTime} gacha</b>.\n\n` +
+                     `⚙️ Ish rejimingiz: <b>${employee.startTime} - ${employee.endTime}${employee.startTime2 && employee.endTime2 ? ` / ${employee.startTime2} - ${employee.endTime2}` : ''}</b>.\n\n` +
                      `📊 <b>Sizning Shaxsiy Statistikangiz:</b>\n` +
                      `• 📅 Jami ishlangan kunlar: <b>${totalDays} kun</b>\n` +
                      `• ⏰ Jami ishlangan vaqt: <b>${hours} soat, ${mins} daqiqa</b>\n` +
@@ -667,7 +673,7 @@ function initializeBot() {
         }
 
         const resp = `👋 Xush kelibsiz, <b>${employee.name}</b>!\n\n` +
-                     `⚙️ Ish rejimingiz: <b>${employee.startTime} dan ${employee.endTime} gacha</b>.\n\n` +
+                     `⚙️ Ish rejimingiz: <b>${employee.startTime} - ${employee.endTime}${employee.startTime2 && employee.endTime2 ? ` / ${employee.startTime2} - ${employee.endTime2}` : ''}</b>.\n\n` +
                      `📊 <b>Sizning Shaxsiy Statistikangiz:</b>\n` +
                      `• 📅 Jami ishlangan kunlar: <b>${totalDays} kun</b>\n` +
                      `• ⏰ Jami ishlangan vaqt: <b>${hours} soat, ${mins} daqiqa</b>\n` +
@@ -774,9 +780,11 @@ function initializeBot() {
         ctx.answerCbQuery().catch(() => {});
         const text = `➕ <b>Yangi Xodim Qo'shish Yo'riqnomasi:</b>\n\n` +
                      `Xodimni bot orqali qo'shish uchun quyidagi matn formatida botga xabar yuboring:\n` +
-                     `<code>/add &lt;telegram_id&gt; &lt;Ism Familiya&gt; &lt;ish_boshlash_vaqti&gt; &lt;ish_yakunlash_vaqti&gt;</code>\n\n` +
-                     `💬 <b>Misol:</b>\n` +
+                     `<code>/add &lt;telegram_id&gt; &lt;Ism Familiya&gt; &lt;boshlash1&gt; &lt;tugash1&gt; [boshlash2] [tugash2]</code>\n\n` +
+                     `💬 <b>Misol (1 navbat):</b>\n` +
                      `<code>/add 5624377303 Ergashev Sherzod 08:30 18:00</code>\n\n` +
+                     `💬 <b>Misol (2 navbat):</b>\n` +
+                     `<code>/add 5624377303 Xoshimov Abdurasul 8:00 15:00 22:00 2:00</code>\n\n` +
                      `<i>Eslatma: ID xodimning Telegram ID raqami bo'lishi shart. Uni olish uchun xodimizga botni boshlatib bering, u yerda uning ID-si ko'rinadi.</i>`;
 
         return ctx.editMessageText(text, {
@@ -853,25 +861,40 @@ function initializeBot() {
 
       const args = ctx.message.text.split(" ").slice(1);
       if (args.length < 2) {
-        return ctx.reply("⚠️ To'g'ri foydalanish:\n/add <telegram_id> <Ism Sharif> [ish_boshlash: masalan 09:00] [ish_tugash: masalan 18:00]");
+        return ctx.reply("⚠️ To'g'ri foydalanish:\n/add <telegram_id> <Ism Sharif> <boshlash1> <tugash1> [boshlash2] [tugash2]\n\nMisol (1 navbat):\n/add 5624377303 Ergashev Sherzod 08:30 18:00\n\nMisol (2 navbat):\n/add 5624377303 Xoshimov Abdurasul 8:00 15:00 22:00 2:00");
       }
 
       const id = args[0];
-      
+
       let name = "";
       let startTime = "09:00";
       let endTime = "18:00";
+      let startTime2: string | null = null;
+      let endTime2: string | null = null;
 
       const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-      const potentialEndTime = args[args.length - 1];
-      const potentialStartTime = args[args.length - 2];
 
-      if (potentialEndTime && timeRegex.test(potentialEndTime) && potentialStartTime && timeRegex.test(potentialStartTime)) {
-        startTime = potentialStartTime;
-        endTime = potentialEndTime;
+      // Count how many trailing args are valid time strings (up to 4)
+      let timeCount = 0;
+      for (let i = args.length - 1; i >= 1 && timeCount < 4; i--) {
+        if (timeRegex.test(args[i])) timeCount++;
+        else break;
+      }
+
+      if (timeCount >= 4) {
+        // 2 shifts provided: name start1 end1 start2 end2
+        startTime = args[args.length - 4];
+        endTime = args[args.length - 3];
+        startTime2 = args[args.length - 2];
+        endTime2 = args[args.length - 1];
+        name = args.slice(1, args.length - 4).join(" ");
+      } else if (timeCount >= 2) {
+        // 1 shift provided: name start1 end1
+        startTime = args[args.length - 2];
+        endTime = args[args.length - 1];
         name = args.slice(1, args.length - 2).join(" ");
-      } else if (potentialEndTime && timeRegex.test(potentialEndTime)) {
-        endTime = potentialEndTime;
+      } else if (timeCount === 1) {
+        endTime = args[args.length - 1];
         name = args.slice(1, args.length - 1).join(" ");
       } else {
         name = args.slice(1).join(" ");
@@ -881,12 +904,18 @@ function initializeBot() {
         return ctx.reply("❌ Xodim ismi bo'sh bo'lishi mumkin emas.");
       }
 
+      const shiftText = startTime2 && endTime2
+        ? `1-navbat: ${startTime} - ${endTime}\n2-navbat: ${startTime2} - ${endTime2}`
+        : `Ish vaqti: ${startTime} - ${endTime}`;
+
       const existing = db.employees.find((e) => e.telegramId === id);
       if (existing) {
         existing.name = name;
         existing.startTime = startTime;
         existing.endTime = endTime;
-        ctx.reply(`✏️ Xodim ma'lumotlari yangilandi:\n👤 ${name}\n⏰ Ish vaqti: ${startTime} - ${endTime}`);
+        existing.startTime2 = startTime2;
+        existing.endTime2 = endTime2;
+        ctx.reply(`✏️ Xodim ma'lumotlari yangilandi:\n👤 ${name}\n⏰ ${shiftText}`);
       } else {
         db.employees.push({
           id,
@@ -895,9 +924,11 @@ function initializeBot() {
           telegramUsername: null,
           startTime,
           endTime,
+          startTime2,
+          endTime2,
           createdAt: Date.now()
         });
-        ctx.reply(`✅ Yangi xodim qo'shildi:\n👤 ${name}\n🆔 Telegram ID: ${id}\n⏰ Ish vaqti: ${startTime} - ${endTime}`);
+        ctx.reply(`✅ Yangi xodim qo'shildi:\n👤 ${name}\n🆔 Telegram ID: ${id}\n⏰ ${shiftText}`);
       }
 
       writeDB(db);
@@ -1020,6 +1051,38 @@ function initializeBot() {
       ctx.replyWithHTML(statsMsg);
     });
 
+    // Forward an employee's video note to all admins along with their tracking info
+    const notifyAdminsWithVideo = (
+      ctx: any,
+      db: DBData,
+      employee: { id: string; name: string; telegramId: string | null; telegramUsername: string | null },
+      type: "checkin" | "checkout",
+      timeStr: string,
+      dateStr: string,
+      extraInfo: string
+    ) => {
+      const typeLabel = type === "checkin" ? "📥 KELDI (Check-in)" : "📤 KETDI (Check-out)";
+      const caption =
+        `${typeLabel}\n\n` +
+        `👤 <b>Xodim:</b> ${employee.name}\n` +
+        `🆔 <b>Telegram ID:</b> <code>${employee.telegramId || "yo'q"}</code>\n` +
+        `👤 <b>Username:</b> ${employee.telegramUsername ? "@" + employee.telegramUsername : "yo'q"}\n` +
+        `📅 <b>Sana:</b> ${dateStr}\n` +
+        `⏰ <b>Vaqt:</b> ${timeStr}\n` +
+        `${extraInfo}`;
+
+      db.settings.adminIds.forEach((adminId) => {
+        ctx.telegram
+          .sendVideoNote(adminId, ctx.message.video_note.file_id)
+          .then(() => {
+            ctx.telegram.sendMessage(adminId, caption, { parse_mode: "HTML" }).catch(() => {});
+          })
+          .catch((err: any) => {
+            console.error(`Failed to forward video note to admin ${adminId}:`, err?.message || err);
+          });
+      });
+    };
+
     // Handle Circular Video Notes (video_note)
     bot.on("video_note", (ctx) => {
       const fromId = String(ctx.from.id);
@@ -1090,11 +1153,17 @@ function initializeBot() {
                            `👤 <b>Xodim:</b> ${employee.name}\n` +
                            `📅 <b>Sana:</b> ${dateStr}\n` +
                            `⏰ <b>Kelgan vaqtingiz:</b> ${timeStr}\n` +
-                           `⏱️ Belgilangan ish vaqti: ${employee.startTime}\n\n` +
+                           `⏱️ Belgilangan ish vaqti: ${employee.startTime}${employee.startTime2 && employee.endTime2 ? ` / ${employee.startTime2} - ${employee.endTime2}` : ''}\n\n` +
                            `${warningText}\n\n` +
                            `💼 Ish tugagach, yana bitta yumaloq video yuborishni unutmang.`;
 
         ctx.replyWithHTML(checkInMsg);
+
+        const checkInExtraInfo =
+          latenessMinutes > 0
+            ? `⏱️ <b>Kechikish:</b> ${Math.max(0, latenessMinutes)} daqiqa\n💸 <b>Jarima:</b> ${penaltyAmount.toLocaleString()} so'm`
+            : `✅ Kechikishsiz keldi`;
+        notifyAdminsWithVideo(ctx, db, employee, "checkin", timeStr, dateStr, checkInExtraInfo);
       } else if (!record.isCompleted) {
         // --- CHECK OUT MODE ---
         if (record.checkIn && messageEpoch <= record.checkIn) {
@@ -1162,6 +1231,12 @@ function initializeBot() {
                             `Kuningiz xayrli o'tsin!`;
 
         ctx.replyWithHTML(checkOutMsg);
+
+        const checkOutExtraInfo =
+          `💼 <b>Ishladi:</b> ${hours} soat ${mins} daqiqa\n` +
+          `🍁 <b>Mavsum:</b> ${seasonName}\n` +
+          `💰 <b>Yakuniy to'lov:</b> ${finalSalary.toLocaleString()} so'm`;
+        notifyAdminsWithVideo(ctx, db, employee, "checkout", timeStr, dateStr, checkOutExtraInfo);
       } else {
         // Already checked in and checked out
         const { timeStr: checkInTime } = getTashkentDateParts(record.checkIn || 0);
@@ -1397,7 +1472,7 @@ app.get("/api/stats", (req, res) => {
 // 4. Settings Configuration
 app.get("/api/settings", (req, res) => {
   const db = readDB();
-  const token = process.env.TELEGRAM_BOT_TOKEN || db.settings.botToken || "";
+  const token = db.settings.botToken || process.env.TELEGRAM_BOT_TOKEN || "";
   const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.WEBHOOK_URL || "";
   const cleanToken = token.replace(/[^a-zA-Z0-9]/g, "");
   
@@ -1430,7 +1505,7 @@ app.post("/api/settings", (req, res) => {
     initializeBot();
   }
 
-  const token = process.env.TELEGRAM_BOT_TOKEN || db.settings.botToken || "";
+  const token = db.settings.botToken || process.env.TELEGRAM_BOT_TOKEN || "";
   const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.WEBHOOK_URL || "";
   const cleanToken = token.replace(/[^a-zA-Z0-9]/g, "");
 
@@ -1447,7 +1522,7 @@ app.post("/api/settings", (req, res) => {
 // Telegram Webhook Handler Route
 app.post("/webhook/:botTokenPath", (req, res) => {
   const db = readDB();
-  const token = process.env.TELEGRAM_BOT_TOKEN || db.settings.botToken || "";
+  const token = db.settings.botToken || process.env.TELEGRAM_BOT_TOKEN || "";
   const cleanToken = token.replace(/[^a-zA-Z0-9]/g, "");
 
   if (req.params.botTokenPath === cleanToken && bot) {
